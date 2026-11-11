@@ -1,0 +1,239 @@
+local Players = game:GetService("Players")
+
+local HITBOX_SIZE = Vector3.new (4, 5, 1)
+
+local function setupPlayer(player)
+    player.CharacterAdded:Connect(function(character)
+        if player == Players.LocalPlayer then
+            return
+        end
+
+        local root = character:WaitForChild("HumanoidRootPart")
+
+        root.Size = HITBOX_SIZE
+        root.Transparency = 1
+        root.CanCollide = false
+    end)
+
+    if player.Character and player ~= Players.LocalPlayer then
+        local root = player.Character:FindFirstChild("HumanoidRootPart")
+
+        if root then
+            root.Size = HITBOX_SIZE
+            root.Transparency = 1
+            root.CanCollide = false
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(setupPlayer)
+
+for _, player in ipairs(Players:GetPlayers()) do
+    setupPlayer(player)
+end
+
+local function normalBlood(bloodEmitter)
+    bloodEmitter.Size = NumberSequence.new(1)
+    bloodEmitter.Speed = NumberRange.new(5, 8)
+    bloodEmitter.Rate = 0
+end
+ 
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+
+local ESPEnabled = false
+local ESPObjects = {}
+
+-- Remove ESP
+local function removeESP(player)
+    if ESPObjects[player] then
+        ESPObjects[player]:Destroy()
+        ESPObjects[player] = nil
+    end
+end
+
+-- Create ESP
+local function createESP(player)
+    if player == LocalPlayer then return end
+    if not ESPEnabled then return end
+    if not player.Character then return end
+
+    removeESP(player)
+
+    local character = player.Character
+    local root = character:FindFirstChild("HumanoidRootPart")
+
+    if not root then return end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "PlayerNameESP"
+    billboard.Size = UDim2.new(0, 100, 0, 16)
+    billboard.StudsOffset = Vector3.new(0, -3.5, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Adornee = root
+    billboard.Parent = root
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.fromScale(1, 1)
+    label.BackgroundTransparency = 1
+    label.Text = player.Name
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    label.TextStrokeTransparency = 0
+    label.TextSize = 10
+    label.Font = Enum.Font.Gotham
+    label.Parent = billboard
+
+    ESPObjects[player] = billboard
+end
+
+
+local function refreshESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if ESPEnabled then
+            createESP(player)
+        else
+            removeESP(player)
+        end
+    end
+end
+
+
+local function toggleESP()
+    ESPEnabled = not ESPEnabled
+    refreshESP()
+end
+
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+
+    if input.KeyCode == Enum.KeyCode.V then
+        toggleESP()
+    end
+end)
+
+
+local function setupPlayer(player)
+    if player == LocalPlayer then return end
+
+    player.CharacterAdded:Connect(function()
+        task.wait(1)
+
+        if ESPEnabled then
+            createESP(player)
+        end
+    end)
+end
+
+
+for _, player in ipairs(Players:GetPlayers()) do
+    setupPlayer(player)
+end
+
+
+Players.PlayerAdded:Connect(function(player)
+    setupPlayer(player)
+
+    if ESPEnabled then
+        createESP(player)
+    end
+end)
+
+
+Players.PlayerRemoving:Connect(function(player)
+    removeESP(player)
+end)
+
+local UIS = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+local shooting = false
+local delay = 0
+
+local function isCrouching()
+    return UIS:IsKeyDown(Enum.KeyCode.LeftControl)
+        or UIS:IsKeyDown(Enum.KeyCode.RightControl)
+end
+
+local function shoot()
+    if isCrouching() then return end
+
+    local character = player.Character
+    if not character then return end
+
+    local tool = character:FindFirstChildOfClass("Tool")
+    if tool then
+        tool:Activate()
+    end
+end
+
+UIS.InputBegan:Connect(function(input, processed)
+    if processed then return end
+
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if shooting then return end
+        shooting = true
+
+        task.spawn(function()
+            while shooting do
+                shoot()
+                task.wait(delay)
+            end
+        end)
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        shooting = false
+    end
+end)
+
+local ShotgunSpread = {}
+
+local SETTINGS = {
+    Tac = {
+        Pellets = 8,
+        Spread = 1
+    },
+
+    DB = {
+        Pellets = 10,
+        Spread = 1
+    }
+}
+
+function ShotgunSpread.GetDirections(weaponName, origin, direction)
+    local config = SETTINGS[weaponName]
+    if not config then
+        return {}
+    end
+
+    local directions = {}
+    local forward = direction.Unit
+
+    local right = forward:Cross(Vector3.yAxis).Unit
+    local up = right:Cross(forward).Unit
+
+    for i = 1, config.Pellets do
+        local x = (math.random() - 0.5) * 2
+        local y = (math.random() - 0.5) * 2
+
+        local spreadDirection = (
+            forward
+            + right * x * math.rad(config.Spread)
+            + up * y * math.rad(config.Spread)
+        ).Unit
+
+        table.insert(directions, spreadDirection)
+    end
+
+    return directions
+end
+
+return ShotgunSpread
